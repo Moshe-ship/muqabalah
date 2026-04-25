@@ -226,20 +226,81 @@ def balance(
     # Sort actions by removed_span start to apply in reading order.
     all_actions.sort(key=lambda a: a[1][0])
 
+    # Resolve action interactions. Two semantic rules:
+    #   1. CONTAINMENT — if action A's span fully contains action B's span,
+    #      A subsumes B. B is dropped silently and recorded in the trace
+    #      via A's effect. (E.g., a duplicate-sentence removal subsumes a
+    #      word-level normalization inside that sentence — the word is
+    #      being removed anyway.)
+    #   2. PARTIAL OVERLAP — if two actions share spans without one fully
+    #      containing the other, that is a true configuration conflict.
+    #      Raise CancellationConflict; the caller must reconcile.
+    def _spans_overlap(a, b):
+        sa, ea = a
+        sb, eb = b
+        return not (ea <= sb or eb <= sa)
+
+    def _contains(outer, inner):
+        return outer[0] <= inner[0] and inner[1] <= outer[1]
+
+    # Drop subsumed (fully-contained) actions
+    surviving: list[tuple] = []
+    for i, action_i in enumerate(all_actions):
+        span_i = action_i[1]
+        subsumed = False
+        for j, action_j in enumerate(all_actions):
+            if i == j:
+                continue
+            span_j = action_j[1]
+            if _contains(span_j, span_i) and span_j != span_i:
+                subsumed = True
+                break
+        if not subsumed:
+            surviving.append(action_i)
+
+    # Now check for partial overlaps among survivors
+    overlap_conflicts: list[dict[str, Any]] = []
+    for i in range(len(surviving)):
+        for j in range(i + 1, len(surviving)):
+            ai = surviving[i]
+            aj = surviving[j]
+            si, ei = ai[1]
+            sj, ej = aj[1]
+            if _spans_overlap(ai[1], aj[1]):
+                # Survivors overlap and neither contains the other → partial overlap
+                if not (_contains(ai[1], aj[1]) or _contains(aj[1], ai[1])):
+                    overlap_conflicts.append({
+                        "type": "overlapping_actions",
+                        "action_a": {
+                            "kind": ai[0], "span": [si, ei],
+                            "kept_text": ai[2], "source": ai[5],
+                        },
+                        "action_b": {
+                            "kind": aj[0], "span": [sj, ej],
+                            "kept_text": aj[2], "source": aj[5],
+                        },
+                        "rationale": (
+                            f"Detectors {ai[5]!r} and {aj[5]!r} proposed "
+                            f"partially-overlapping transformations on spans "
+                            f"[{si},{ei}] and [{sj},{ej}]; refusing to choose."
+                        ),
+                    })
+    if overlap_conflicts:
+        raise CancellationConflict(
+            f"Found {len(overlap_conflicts)} partially-overlapping action conflict(s); "
+            f"detectors must produce non-overlapping or fully-containing action proposals.",
+            overlap_conflicts,
+        )
+
+    all_actions = surviving
+
     output_parts: list[str] = []
     cursor = 0
     final_entries: list[CancellationEntry] = []
 
-    output_offset = 0  # tracks current position in output as we build it
-
     for action in all_actions:
         kind, removed_span, kept_text, rationale, confidence, source = action
         start, end = removed_span
-        if start < cursor:
-            # Overlap with prior action — skip silently to keep output coherent.
-            # In practice, detectors should not produce overlaps; if they do,
-            # earlier-listed detector wins.
-            continue
 
         # Append literal characters up to the removed span
         output_parts.append(prompt[cursor:start])
