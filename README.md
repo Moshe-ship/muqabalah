@@ -1,5 +1,8 @@
 # muqabalah (المقابلة) — Reversible Cancellation + Normalization
 
+> Part of the [**Mizan**](https://github.com/Moshe-ship/mizan) stack — the Arabic-first reliability scale for AI agents.
+
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-green.svg)](https://python.org)
 [![Tests: 19 passing](https://img.shields.io/badge/tests-19%20passing-green.svg)]()
