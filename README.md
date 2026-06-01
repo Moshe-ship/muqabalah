@@ -6,7 +6,7 @@
 [![PyPI](https://img.shields.io/pypi/v/muqabalah)](https://pypi.org/project/muqabalah/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-green.svg)](https://python.org)
-[![Tests: 19 passing](https://img.shields.io/badge/tests-19%20passing-green.svg)]()
+[![CI](https://github.com/Moshe-ship/muqabalah/actions/workflows/ci.yml/badge.svg)](https://github.com/Moshe-ship/muqabalah/actions/workflows/ci.yml)
 
 The Balance operation as a standalone primitive. Companion to `jabr`. Reversible. Audited. **Fail-loud on contradiction**.
 
